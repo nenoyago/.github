@@ -60,7 +60,6 @@ jobs:
           extra_plugins: |
             - "@semantic-release/exec"
         env:
-          # [CORREÇÃO 3] Lógica para usar o token correto dependendo do gatilho.
           GITHUB_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           HUSKY: "0"
