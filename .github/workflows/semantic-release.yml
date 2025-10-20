@@ -5,10 +5,6 @@ on:
     secrets:
       GH_TOKEN:
         required: true
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
     outputs:
       new_release_published:
         description: "Whether a new release was published"
@@ -24,7 +20,10 @@ jobs:
   semantic-release:
     name: 🏷️ Release Version
     runs-on: ubuntu-latest
-    # REMOVEMOS O BLOCO 'permissions' DAQUI
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     environment:
       name: Semver
 
