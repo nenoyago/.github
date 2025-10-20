@@ -60,17 +60,35 @@ jobs:
           extra_plugins: |
             - "@semantic-release/exec"
         env:
+          # [CORREÇÃO 3] Lógica para usar o token correto dependendo do gatilho.
           GITHUB_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           HUSKY: "0"
 
-      - name: 🎉 Log New Release Details (Resumo)
+      - name: 🎉 Log New Release Details
         if: steps.release.outputs.new_release_published == 'true'
         run: |
-          NEW_TYPE=${{ steps.release.outputs.new_release_type }}
           NEW_VERSION=${{ steps.release.outputs.new_release_version }}
           NEW_TAG=${{ steps.release.outputs.new_release_git_tag }}
           RELEASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/tag/$NEW_TAG"
+
+          # Calculate release type by comparing versions
+          PREV_TAG=$(git tag | sort -V | tail -2 | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            NEW_TYPE="major"
+          else
+            PREV_VERSION=${PREV_TAG#v}  # Remove 'v' prefix if present
+            IFS='.' read -r PREV_MAJOR PREV_MINOR PREV_PATCH <<< "$PREV_VERSION"
+            IFS='.' read -r NEW_MAJOR NEW_MINOR NEW_PATCH <<< "$NEW_VERSION"
+
+            if [ "$NEW_MAJOR" -gt "$PREV_MAJOR" ]; then
+              NEW_TYPE="major"
+            elif [ "$NEW_MINOR" -gt "$PREV_MINOR" ]; then
+              NEW_TYPE="minor"
+            else
+              NEW_TYPE="patch"
+            fi
+          fi
 
           echo "🚀 New Release Published!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -80,6 +98,7 @@ jobs:
           echo "🔗 Release: $RELEASE_URL"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+          # Save type for summary
           echo "$NEW_TYPE" > new_type.txt
 
       - name: 💬 Log No Release
