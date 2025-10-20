@@ -1,0 +1,134 @@
+name: 🚀 Semantic Release Automation
+
+on:
+  workflow_call:
+    secrets:
+      GH_TOKEN:
+        required: true
+
+    outputs:
+      new_release_published:
+        description: "Whether a new release was published"
+        value: ${{ jobs.semantic-release.outputs.new_release_published }}
+      new_release_version:
+        description: "The version number of the new release"
+        value: ${{ jobs.semantic-release.outputs.new_release_version }}
+      new_release_git_tag:
+        description: "The git tag of the new release"
+        value: ${{ jobs.semantic-release.outputs.new_release_git_tag }}
+
+jobs:
+  semantic-release:
+    name: 🏷️ Release Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    environment:
+      name: Semver
+
+    outputs:
+      new_release_published: ${{ steps.release.outputs.new_release_published }}
+      new_release_version: ${{ steps.release.outputs.new_release_version }}
+      new_release_git_tag: ${{ steps.release.outputs.new_release_git_tag }}
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.5
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14
+          cache: "pnpm"
+
+      - name: ⚡ Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🚀 Run Semantic Release
+        id: release
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            - "@semantic-release/exec"
+        env:
+          GITHUB_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          HUSKY: "0"
+
+      - name: 🎉 Log New Release Details
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          NEW_VERSION=${{ steps.release.outputs.new_release_version }}
+          NEW_TAG=${{ steps.release.outputs.new_release_git_tag }}
+          RELEASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/tag/$NEW_TAG"
+
+          # Calculate release type by comparing versions
+          PREV_TAG=$(git tag | sort -V | tail -2 | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            NEW_TYPE="major"
+          else
+            PREV_VERSION=${PREV_TAG#v}  # Remove 'v' prefix if present
+            IFS='.' read -r PREV_MAJOR PREV_MINOR PREV_PATCH <<< "$PREV_VERSION"
+            IFS='.' read -r NEW_MAJOR NEW_MINOR NEW_PATCH <<< "$NEW_VERSION"
+
+            if [ "$NEW_MAJOR" -gt "$PREV_MAJOR" ]; then
+              NEW_TYPE="major"
+            elif [ "$NEW_MINOR" -gt "$PREV_MINOR" ]; then
+              NEW_TYPE="minor"
+            else
+              NEW_TYPE="patch"
+            fi
+          fi
+
+          echo "🚀 New Release Published!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔄 Type: $NEW_TYPE"
+          echo "🔢 Version: $NEW_VERSION"
+          echo "🏷️ Tag: $NEW_TAG"
+          echo "🔗 Release: $RELEASE_URL"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Save type for summary
+          echo "$NEW_TYPE" > new_type.txt
+
+      - name: 💬 Log No Release
+        if: steps.release.outputs.new_release_published != 'true'
+        run: |
+          echo "😴 No New Release"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "No relevant commits detected since the last release."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: 📝 Update Job Summary (New Release)
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          NEW_TYPE=$(cat new_type.txt)
+          echo "## 🚀 New Release Published!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "A new version **${{ steps.release.outputs.new_release_version }}** has been successfully published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | Version | Git Tag |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`$NEW_TYPE\` | \`${{ steps.release.outputs.new_release_version }}\` | \`${{ steps.release.outputs.new_release_git_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.release.outputs.new_release_notes }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View the release on GitHub](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.release.outputs.new_release_git_tag }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📝 Update Job Summary (No Release)
+        if: steps.release.outputs.new_release_published != 'true'
+        run: |
+          echo "## 😴 No New Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No relevant commits were detected since the last release. No new version was published." >> $GITHUB_STEP_SUMMARY
