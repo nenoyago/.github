@@ -71,7 +71,7 @@ jobs:
           RELEASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/tag/$NEW_TAG"
 
           # Calculate release type by comparing versions
-          PREV_TAG=$(git tag | sort -V | tail -2 | head -1)
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
           if [ -z "$PREV_TAG" ]; then
             NEW_TYPE="major"
           else
