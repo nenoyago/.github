@@ -60,8 +60,7 @@ jobs:
           extra_plugins: |
             - "@semantic-release/exec"
         env:
-          GITHUB_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ github.event_name == 'workflow_call' && secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           HUSKY: "0"
 
       - name: 🎉 Log New Release Details
