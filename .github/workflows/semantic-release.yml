@@ -50,6 +50,11 @@ jobs:
           node-version: 22.14
           cache: "pnpm"
 
+      - name: 🔧 Configure .npmrc for GitHub Packages
+        run: |
+          echo "@nenoyago:registry=https://npm.pkg.github.com/" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GH_TOKEN }}" >> .npmrc
+
       - name: ⚡ Install dependencies
         run: pnpm install --frozen-lockfile
 
