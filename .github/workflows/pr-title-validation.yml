@@ -1,7 +1,7 @@
+name: ✏️ Validate PR Title Automation
+
 on:
   workflow_call:
-
-name: PR Title Validation
 
 jobs:
   pr-title:
@@ -61,4 +61,16 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: '✅ PR title validated successfully!'
+            })
+
+      - name: Post error comment
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ PR title validation failed. Please ensure the title follows the format: LIV-{number} - description (e.g., LIV-123 - Fix bug).'
             })
