@@ -1,5 +1,6 @@
-# Validates the Pull Request title in the format: LIV-{number} - description
-# Valid example: LIV-123 - Fix bug in checkout flow
+on:
+  workflow_call:
+
 name: PR Title Validation
 
 jobs:
