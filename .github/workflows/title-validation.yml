@@ -7,10 +7,6 @@ jobs:
   title-check:
     name: 🔍 Check PR Title Format
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
     steps:
       - name: 📝 Extract and validate title
         id: validate
