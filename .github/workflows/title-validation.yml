@@ -1,0 +1,165 @@
+name: ✏️ PR Title Validator
+
+on:
+  workflow_call:
+
+jobs:
+  title-check:
+    name: 🔍 Check PR Title Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📝 Extract and validate title
+        id: validate
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          # Regex: LIV- followed by one or more digits, space, hyphen, space, and at least one non-space character in the title.
+          PATTERN: '^LIV-[0-9]+ - .*\S.*$'
+        run: |
+          echo "PR title: '$TITLE'"
+          echo "Base branch: '$BASE_BRANCH'"
+          echo "Head branch: '$HEAD_BRANCH'"
+
+          # For PRs to 'stage', always validate
+          if [ "$BASE_BRANCH" = "stage" ]; then
+            echo "Validating title for PR to stage..."
+          elif [ "$BASE_BRANCH" = "main" ]; then
+            # For PRs to 'main', validate only if not from 'stage'
+            if [ "$HEAD_BRANCH" = "stage" ]; then
+              echo "PR from stage to main, skipping title validation."
+              exit 0
+            fi
+            echo "Validating title for PR to main from non-stage branch..."
+          else
+            echo "Base branch not stage or main, skipping validation."
+            exit 0
+          fi
+
+          if [ -z "$TITLE" ]; then
+            echo "::error title=PR title validation::❌ PR title is empty."
+            echo "Required format: LIV-{number} - description (e.g., LIV-123 - Task description)"
+            exit 1
+          fi
+
+          if ! echo "$TITLE" | grep -E "$PATTERN" >/dev/null; then
+            echo "::error title=PR title validation::❌ Invalid title. Must follow the pattern: LIV-{number} - description"
+            echo "Example: LIV-123 - Fix bug in checkout flow"
+            echo "Required regex: $PATTERN"
+            exit 1
+          fi
+
+          echo "✅ PR title is valid."
+
+      - name: 🔎 Find existing bot comment
+        if: always()
+        uses: actions/github-script@v8
+        id: find_comment
+        with:
+          script: |
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const botComment = comments.data.find(comment => 
+              comment.body.includes('## ❌ Falha na Validação do Título da PR') ||
+              comment.body.includes('## ✅ Título da PR Validado com Sucesso')
+            );
+
+            return botComment ? botComment.id : null;
+
+      - name: 💚 Post success comment
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const commentBody = `## ✅ Título da PR Validado com Sucesso
+
+            Perfeito! O título desta PR segue o padrão esperado. ✨
+
+            ### 📋 Formato Validado:
+            - **Título atual:** \`${{ github.event.pull_request.title }}\`
+            - **Padrão:** \`LIV-{número} - descrição\`
+            - **Exemplo:** \`LIV-123 - Corrigir bug no checkout\`
+
+            ### 🎯 Status da Validação:
+            - ✅ Formato correto
+            - ✅ Número do ticket presente
+            - ✅ Descrição significativa
+
+            ---
+            *🤖 Última verificação: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}*`;
+
+            const commentId = ${{ steps.find_comment.outputs.result }};
+
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            }
+
+      - name: 🚨 Post error comment
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const commentBody = `## ❌ Falha na Validação do Título da PR
+
+            O título desta PR não segue o padrão esperado. Por favor, ajuste-o para continuar.
+
+            ### 📋 Formato Necessário:
+            **Padrão obrigatório:** \`LIV-{número} - descrição\`
+
+            ### ✅ Exemplos Válidos:
+            - \`LIV-123 - Corrigir bug no checkout\`
+            - \`LIV-456 - Adicionar nova funcionalidade de login\`
+            - \`LIV-789 - Refatorar componente de usuário\`
+
+            ### ❌ Exemplos Inválidos:
+            - \`Corrigir bug\` (falta LIV- e número)
+            - \`LIV-123\` (falta descrição)
+            - \`LIV-abc - Descrição\` (número deve ser dígitos)
+
+            ### 🔧 Como Corrigir:
+            1. Edite o título da PR
+            2. Use o formato: \`LIV-{número} - descrição clara\`
+            3. O workflow será executado automaticamente
+
+            ### 📚 Regras Detalhadas:
+            - Deve começar com \`LIV-\`
+            - Seguido de um ou mais dígitos (ex: 123, 4567)
+            - Espaço, hífen, espaço
+            - Descrição significativa (não vazia)
+
+            ---
+            *🤖 Última verificação: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}*`;
+
+            const commentId = ${{ steps.find_comment.outputs.result }};
+
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            }
